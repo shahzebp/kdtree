@@ -47,9 +47,9 @@ int main(int argc, char* argv[])
 
     const unsigned int dim = data.front().size();
 
-    kd_tree<double> *Tree = new kd_tree<double>(dim);
+    KDTree<double> *Tree = new KDTree<double>(dim);
 
-    vector<kd_tree<double>::kd_point> Points, nearPoints;
+    vector<KDTree<double>::KDPoint> Points, nearPoints;
 
 	Tree->rebuild(data);
 
@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
 
     for (row = data.begin(); row != data.end(); row++) {
 		
-        kd_tree<double>::kd_point Point;
+        KDTree<double>::KDPoint Point;
 		int i = 0;
 		for (col = row->begin(); col != row->end(); col++) {
 		
@@ -69,7 +69,7 @@ int main(int argc, char* argv[])
 			i++;
 		}
 		
-		kd_tree<double>::kd_point nearPoint;
+		KDTree<double>::KDPoint nearPoint;
 
 		Tree->nearestNeighbor(Point, nearPoint);
 		

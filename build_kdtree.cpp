@@ -69,7 +69,7 @@ int main(int argc, char* argv[])
 
     std::cin >> dumpFile;
 
-    Tree->PrintTree(dumpFile);
+    Tree->printKDTree(dumpFile);
     
     return 0;
 }
