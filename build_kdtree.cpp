@@ -31,45 +31,50 @@ std::vector<std::vector<double>> getNextLineAndSplitIntoTokens(std::istream& str
 
 int main(int argc, char* argv[])
 {
-
-    std::cout << "Enter the file name containing sample data file" << std::endl;
+    std::cout << "Enter the file name containing sample data file" 
+                    << std::endl;
     std::string sampleFile;
     std::cin >> sampleFile;
 
 	std::ifstream file(sampleFile);
 
-    std::vector<std::vector<double>> data = getNextLineAndSplitIntoTokens(file);	
-
+    std::vector<std::vector<double>> data = 
+                        getNextLineAndSplitIntoTokens(file);	
+    
     constexpr unsigned int dim = 3;//data.front().size();
 
 	KDTree<double> *Tree = new KDTree<double>(3);
 
-    std::vector<KDTree<double>::KDPoint> Points, nearPoints;
+    std::vector<KDTree<double>::KDData> Points, nearPoints;
 
     std::vector<std::vector<double> >::iterator row;
     std::vector<double>::iterator col;
 
+    unsigned index = 0;
+
     for (row = data.begin(); row != data.end(); row++) {
 		
-        KDTree<double>::KDPoint Point;
+        KDTree<double>::KDData Point;
 		int i = 0;
 		for (col = row->begin(); col != row->end(); col++) {
-		
-            Point.push_back((*col));
+		  
+            Point.first.push_back((*col));
 			i++;
 		}
+        Point.second = index;
+        index++;
 
         Points.push_back(Point);
 	}
 	
     Tree->insert(Points);
 
-    std::cout << "Enter the name of file to dump the tree" << std::endl;
+    std::cout << "Enter the name of file to dump the tree" 
+                    << std::endl;
     std::string dumpFile;
-
     std::cin >> dumpFile;
 
     Tree->printKDTree(dumpFile);
-    
+   
     return 0;
 }

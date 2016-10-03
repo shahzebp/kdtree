@@ -16,57 +16,62 @@ class KDTree
 {
 
 public:
-    typedef std::vector<T>                      KDPoint;
-    typedef std::pair<KDPoint, KDPoint>         KDPlane;
-    typedef typename std::vector<KDPoint>::iterator KDPointIterator;
+    typedef std::vector<T>                     KDPoint;
+    typedef std::pair<KDPoint, unsigned>        KDData;
+    typedef std::pair<KDData, KDData>          KDPlane;
+    typedef typename std::vector<KDData>::iterator KDPointIterator;
 
-private:
-    static float getDistance(const KDPoint &P, const KDPoint &Q) {
+
+    static T getDistance(const KDData &P, const KDData &Q) {
         return sqrtf(getDistanceSq(P, Q));
     }
 
-    static float getDistanceSq(const KDPoint &P, const KDPoint &Q) {
-        float Sum = 0;
-        int dimension = P.size();
+private:
+    int  m_dimension;
+
+    static float getDistanceSq(const KDData &P, const KDData &Q) {
+        T Sum = 0;
+        int dimension = P.first.size();
 
         for (unsigned i = 0; i < dimension; i++)
-            Sum += (P[i] - Q[i]) * (P[i] - Q[i]);
+            Sum += (P.first[i] - Q.first[i]) * (P.first[i] - Q.first[i]);
 
         return Sum;
     }
 
     static bool intersectPlane(const KDPlane &Region1, const KDPlane &Region2)
     {
-        int dimension = Region1.first.size();
+        int dimension = Region1.first.first.size();
 
         for (unsigned i = 0; i < dimension; i++)
-            if (Region1.first[i] > Region2.second[i] || Region1.second[i] < Region2.first[i])
+            if (Region1.first.first[i] > Region2.second.first[i] || 
+                Region1.second.first[i] < Region2.first.first[i])
                 return false;
 
         return true;
     }
 
-    static KDPlane createPlane(const KDPoint &Point1, const KDPoint &Point2) {
+    static KDPlane createPlane(const KDData &Point1, const KDData &Point2) {
         
-        int dimension = Point1.size();
+        int dimension = Point1.first.size();
         KDPlane retVal;
 
         for (unsigned i = 0; i < dimension; i++) {
-            retVal.first.push_back(std::min(Point1[i], Point2[i]));
-            retVal.second.push_back(std::max(Point1[i], Point2[i]));
+            retVal.first.first.push_back(std::min(Point1.first[i], Point2.first[i]));
+            retVal.second.first.push_back(std::max(Point1.first[i], Point2.first[i]));
         }
 
         return retVal;
     }
 
-    static KDPlane createPlane(const KDPoint &Point, T distance) {
-        int dimension = Point.size();
+    static KDPlane createPlane(const KDData &Point, T distance) {
+        int dimension = Point.first.size();
 
         KDPlane retVal;
 
         for (unsigned i = 0; i < dimension; i++) {
-            retVal.first.push_back(Point[i] - distance);
-            retVal.second.push_back(Point[i] + distance);
+            retVal.first.first.push_back(Point.first[i] - distance);
+            retVal.second.first.push_back(Point.first[i] + distance);
         }
 
         return retVal;
@@ -82,24 +87,24 @@ private:
             for (KDPointIterator currPoint = 
                     std::next(iterBegin); currPoint != iterEnd; currPoint++) {
                 for (unsigned i = 0; i < m_dimension; i++) {
-                    retVal.first[i]  = std::min(retVal.first[i],  (*currPoint)[i]);
-                    retVal.second[i] = std::max(retVal.second[i], (*currPoint)[i]);
+                    retVal.first.first[i]  = std::min(retVal.first.first[i],  (*currPoint).first[i]);
+                    retVal.second.first[i] = std::max(retVal.second.first[i], (*currPoint).first[i]);
                 }
             }
         }
         else {
             for (unsigned i = 0; i < m_dimension; i++) {
-                retVal.first.push_back(std::numeric_limits<T>::quiet_NaN());
-                retVal.second.push_back(std::numeric_limits<T>::quiet_NaN());
+                retVal.first.first.push_back(std::numeric_limits<T>::quiet_NaN());
+                retVal.second.first.push_back(std::numeric_limits<T>::quiet_NaN());
             }
         }
 
         return retVal;
     }
 
-    unsigned diffIndex(const KDPoint &P, const KDPoint &Q, unsigned s = 0) {
+    unsigned diffIndex(const KDData &P, const KDData &Q, unsigned s = 0) {
         for (unsigned i = 0; i < m_dimension; ++i, ++s %= m_dimension)
-            if (P[s] != Q[s])
+            if (P.first[s] != Q.first[s])
                 return s;
 
         return m_dimension;
@@ -115,7 +120,7 @@ protected:
     public:
         virtual bool        isInternal() const = 0;
         virtual KDPlane     boundedPlane() const = 0;
-        virtual void        nearestNeighbor(const KDPoint &srcPoint, KDPoint &nearPoint,
+        virtual void        nearestNeighbor(const KDData &srcPoint, KDData &nearPoint,
                                      T &minDistance, KDPlane &minRegion) const = 0;
     };
 
@@ -155,7 +160,7 @@ protected:
             return m_boundingBox; 
         }
 
-        virtual void nearestNeighbor(const KDPoint &srcPoint, KDPoint &nearPoint,
+        virtual void nearestNeighbor(const KDData &srcPoint, KDData &nearPoint,
                                      T &minDistance, KDPlane &minRegion) 
                                      const override {
 
@@ -170,20 +175,20 @@ protected:
     class KDLeafNode : public KDNode {
 
     private:
-        KDPoint m_pointCoords;
+        KDData m_pointCoords;
 
     public:
         WKPTR<KDLeafNode> m_Prev, m_Next;
 
-        KDLeafNode(const KDPoint &Point) : m_pointCoords(Point) { }
+        KDLeafNode(const KDData &Point) : m_pointCoords(Point) { }
 
-        KDLeafNode(const KDPoint &Point, WKPTR<KDLeafNode> Prev, 
+        KDLeafNode(const KDData &Point, WKPTR<KDLeafNode> Prev, 
                 WKPTR<KDLeafNode> Next) :
                     m_pointCoords(Point),
                     m_Prev(Prev),
                     m_Next(Next) {}
 
-        const KDPoint pointCoords() const { return m_pointCoords; }
+        const KDData pointCoords() const { return m_pointCoords; }
 
         virtual bool isInternal() const override  { return false; }
 
@@ -191,8 +196,8 @@ protected:
             return { m_pointCoords, m_pointCoords };
         }
 
-        virtual void nearestNeighbor(const KDPoint &srcPoint,
-                                     KDPoint &nearPoint,
+        virtual void nearestNeighbor(const KDData &srcPoint,
+                                     KDData &nearPoint,
                                      T &minDistance, 
                                      KDPlane &minRegion) const override {
                 T currDistance = getDistance(srcPoint, m_pointCoords);
@@ -209,24 +214,24 @@ protected:
                          KDPointIterator iterEnd,
                          const unsigned num) {
         // Sorting on the basis of split axis
-        std::sort(iterBegin, iterEnd, [num](const KDPoint &A, const KDPoint &B) {
-                return A[num] < B[num];
+        std::sort(iterBegin, iterEnd, [num](const KDData &A, const KDData &B) {
+                return A.first[num] < B.first[num];
         });
 
         size_t numPoints = iterEnd - iterBegin;
 
-        T median = (*(iterBegin + numPoints / 2))[num];
+        T median = (*(iterBegin + numPoints / 2)).first[num];
 
         if (numPoints % 2 == 0)
-            median = (median + (*(iterBegin + numPoints / 2 - 1))[num]) / 2.0f;
+            median = (median + (*(iterBegin + numPoints / 2 - 1)).first[num]) / 2.0f;
 
-        if (median == (*(iterEnd - 1))[num] && median != (*iterBegin)[num])
+        if (median == (*(iterEnd - 1)).first[num] && median != (*iterBegin).first[num])
         {
             KDPointIterator medianIter = iterBegin + numPoints / 2;
 
-            while (median == (*(--medianIter))[num]);
+            while (median == (*(--medianIter)).first[num]);
 
-            median = (median + (*medianIter)[num]) / 2.0f;
+            median = (median + (*medianIter).first[num]) / 2.0f;
         }
 
         return median;
@@ -256,10 +261,10 @@ protected:
         }
         else if (iterEnd - iterBegin == 2)
         {
-            KDPoint point0 = *iterBegin, point1 = *(std::next(iterBegin));
+            KDData point0 = *iterBegin, point1 = *(std::next(iterBegin));
             unsigned splitAxis = diffIndex(point0, point1, Depth % m_dimension);
 
-            if (point0[splitAxis] > point1[splitAxis])
+            if (point0.first[splitAxis] > point1.first[splitAxis])
                 std::swap(point0, point1);
 
             SHRPTR<KDLeafNode> Left(new KDLeafNode(point0)), 
@@ -279,7 +284,7 @@ protected:
             lastLeaf = Right;
 
             SHRPTR<KDInnerNode> retNode(new KDInnerNode((
-                            point0[splitAxis] + point1[splitAxis]) / 2.0f, splitAxis,
+                            point0.first[splitAxis] + point1.first[splitAxis]) / 2.0f, splitAxis,
                             createPlane(point0, point1), Left, Right));
 
             return retNode;
@@ -292,10 +297,10 @@ protected:
 
             KDPointIterator lastMedianLoc = iterBegin + numPoints / 2;
 
-            if ((*lastMedianLoc)[splitAxis] != (*std::prev(iterEnd))[splitAxis])
-                while ((*(++lastMedianLoc))[splitAxis] == median);
+            if ((*lastMedianLoc).first[splitAxis] != (*std::prev(iterEnd)).first[splitAxis])
+                while ((*(++lastMedianLoc)).first[splitAxis] == median);
             else
-                while ((*std::prev(lastMedianLoc))[splitAxis] == median)
+                while ((*std::prev(lastMedianLoc)).first[splitAxis] == median)
                     lastMedianLoc--;
 
             SHRPTR<KDNode> Left, Right;
@@ -310,7 +315,7 @@ protected:
         }
     }
 
-    KDPoint semiNearestNeighborPoint(const KDPoint &srcPoint) const {
+    KDData semiNearestNeighborPoint(const KDData &srcPoint) const {
         SHRPTR<KDNode> node(m_root);
         SHRPTR<KDInnerNode> iNode;
 
@@ -318,7 +323,7 @@ protected:
         {
             iNode = std::static_pointer_cast<KDInnerNode>(node);
 
-            node = (srcPoint[iNode->splitAxis()] <= iNode->splitVal()) ? 
+            node = (srcPoint.first[iNode->splitAxis()] <= iNode->splitVal()) ? 
                 iNode->m_left : iNode->m_right;
         }
 
@@ -330,7 +335,6 @@ protected:
     SHRPTR<KDNode>          m_root;
     WKPTR<KDLeafNode>       m_firstLeaf;
     std::ofstream           myfile;
-    int                     m_dimension;
 
 public:
 
@@ -338,7 +342,7 @@ public:
         m_dimension = dim;
     }       
     
-    KDTree(std::vector<KDPoint> &Points, int dim) {
+    KDTree(std::vector<KDData> &Points, int dim) {
         m_dimension = dim;
         insert(Points);
     }
@@ -356,18 +360,18 @@ public:
         if (m_root)
             return m_root->boundedPlane();
         else {
-            KDPoint P1, P2;
+            KDData P1, P2;
 
             for (int i = 0; i < m_dimension; i++){
-                P1.push_back(std::numeric_limits<T>::quiet_NaN());
-                P2.push_back(std::numeric_limits<T>::quiet_NaN());
+                P1.first.push_back(std::numeric_limits<T>::quiet_NaN());
+                P2.first.push_back(std::numeric_limits<T>::quiet_NaN());
             }
 
             return KDPlane(P1, P2);
         }
     }
 
-    void insert(std::vector<KDPoint> &Points) {
+    void insert(std::vector<KDData> &Points) {
         this->clear();
 
         if (Points.size() > 0) {
@@ -386,36 +390,17 @@ public:
         }
     }
 
-    void rebuild(std::vector<std::vector<double>> data) {
-
-        std::vector<KDPoint> points;
-
-        std::vector<std::vector<double> >::iterator row;
-        std::vector<double>::iterator col;
-
-        for (row = data.begin(); row != data.end(); row++) {
-
-            KDPoint Point;
-            int i = 0;
-            for (col = row->begin(); col != row->end(); col++) {
-
-                Point.push_back(*col);
-                i++;
-            }
-            
-            points.push_back(Point);
-        }
-
+    void rebuild(std::vector<KDData> &points) {
         insert(points);
     }
 
-    bool nearestNeighbor(const KDPoint &srcPoint, KDPoint &nearPoint) const
+    bool nearestNeighbor(const KDData &srcPoint, KDData &nearPoint) const
     {
         bool retVal = (m_root != nullptr);
 
         if (!m_root) {
-            for(unsigned int i = 0; i < nearPoint.size(); i++)
-            nearPoint.push_back(std::numeric_limits<T>::quiet_NaN());
+            for(unsigned int i = 0; i < nearPoint.first.size(); i++)
+            nearPoint.first.push_back(std::numeric_limits<T>::quiet_NaN());
         }
         else {
             nearPoint = semiNearestNeighborPoint(srcPoint);
@@ -449,12 +434,14 @@ public:
                 SHRPTR<KDLeafNode> lNode = std::static_pointer_cast
                     <KDLeafNode>(node);
 
-                KDPoint point = lNode->pointCoords();
+                KDData point = lNode->pointCoords();
 
                 std::stringstream ss;
 
+                ss << point.second << " ";
+
                 for (unsigned i = 0; i < m_dimension; i++)
-                    ss << std::setprecision(17) << point[i] << " ";
+                    ss << std::setprecision(17) << point.first[i] << " ";
 
                 myfile << ss.str() << std::endl;;
             }
@@ -466,4 +453,7 @@ public:
         printKDTree(m_root, 0);
     }
 };
+
+
+
 
