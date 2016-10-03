@@ -8,70 +8,71 @@
 #include <fstream>
 #include <iomanip>
 
-#define SHRPTR std::shared_ptr
-#define WKPTR  std::weak_ptr
+#define PRINTPRECISE    std::setprecision(17)
+ 
+#define SHRPTR          std::shared_ptr
+#define WKPTR           std::weak_ptr
 
 template <typename T>
 class KDTree
 {
 
 public:
-    typedef std::vector<T>                     KDPoint;
-    typedef std::pair<KDPoint, unsigned>        KDData;
-    typedef std::pair<KDData, KDData>          KDPlane;
-    typedef typename std::vector<KDData>::iterator KDPointIterator;
+    typedef std::vector<T>                      KDData;
+    typedef std::pair<KDData, unsigned>         KDPoint;
+    typedef std::pair<KDPoint, KDPoint>         KDPlane;
+    typedef typename std::vector<KDPoint>::iterator KDPointIterator;
 
-
-    static T getDistance(const KDData &P, const KDData &Q) {
+    static T getDistance(const KDPoint &P, const KDPoint &Q) {
         return sqrtf(getDistanceSq(P, Q));
     }
 
 private:
     int  m_dimension;
 
-    static float getDistanceSq(const KDData &P, const KDData &Q) {
-        T Sum = 0;
+    static float getDistanceSq(const KDPoint &P, const KDPoint &Q) {
+        T sum = 0;
         int dimension = P.first.size();
 
         for (unsigned i = 0; i < dimension; i++)
-            Sum += (P.first[i] - Q.first[i]) * (P.first[i] - Q.first[i]);
+            sum += (P.first[i] - Q.first[i]) * (P.first[i] - Q.first[i]);
 
-        return Sum;
+        return sum;
     }
 
-    static bool intersectPlane(const KDPlane &Region1, const KDPlane &Region2)
+    static bool intersectPlane(const KDPlane &plane1, const KDPlane &plane2)
     {
-        int dimension = Region1.first.first.size();
+        int dimension = plane1.first.first.size();
 
         for (unsigned i = 0; i < dimension; i++)
-            if (Region1.first.first[i] > Region2.second.first[i] || 
-                Region1.second.first[i] < Region2.first.first[i])
+            if (plane1.first.first[i] > plane2.second.first[i] || 
+                plane1.second.first[i] < plane2.first.first[i])
                 return false;
 
         return true;
     }
 
-    static KDPlane createPlane(const KDData &Point1, const KDData &Point2) {
+    static KDPlane createPlane(const KDPoint &point1, const KDPoint &point2) {
         
-        int dimension = Point1.first.size();
+        int dimension = point1.first.size();
         KDPlane retVal;
 
         for (unsigned i = 0; i < dimension; i++) {
-            retVal.first.first.push_back(std::min(Point1.first[i], Point2.first[i]));
-            retVal.second.first.push_back(std::max(Point1.first[i], Point2.first[i]));
+            retVal.first.first.push_back(std::min(point1.first[i], point2.first[i]));
+            retVal.second.first.push_back(std::max(point1.first[i], point2.first[i]));
         }
 
         return retVal;
     }
 
-    static KDPlane createPlane(const KDData &Point, T distance) {
-        int dimension = Point.first.size();
+    static KDPlane createPlane(const KDPoint &point, T distance) {
+        int dimension = point.first.size();
 
         KDPlane retVal;
 
         for (unsigned i = 0; i < dimension; i++) {
-            retVal.first.first.push_back(Point.first[i] - distance);
-            retVal.second.first.push_back(Point.first[i] + distance);
+            retVal.first.first.push_back(point.first[i] - distance);
+            retVal.second.first.push_back(point.first[i] + distance);
         }
 
         return retVal;
@@ -102,7 +103,7 @@ private:
         return retVal;
     }
 
-    unsigned diffIndex(const KDData &P, const KDData &Q, unsigned s = 0) {
+    unsigned diffIndex(const KDPoint &P, const KDPoint &Q, unsigned s = 0) {
         for (unsigned i = 0; i < m_dimension; ++i, ++s %= m_dimension)
             if (P.first[s] != Q.first[s])
                 return s;
@@ -110,8 +111,8 @@ private:
         return m_dimension;
     }
 
-    unsigned diffIndex(const KDPlane &box, unsigned s = 0) {
-        return diffIndex(box.first, box.second, s);
+    unsigned diffIndex(const KDPlane &plane, unsigned s = 0) {
+        return diffIndex(plane.first, plane.second, s);
     }
 
 protected:
@@ -120,16 +121,17 @@ protected:
     public:
         virtual bool        isInternal() const = 0;
         virtual KDPlane     boundedPlane() const = 0;
-        virtual void        nearestNeighbor(const KDData &srcPoint, KDData &nearPoint,
-                                     T &minDistance, KDPlane &minRegion) const = 0;
+        virtual void        nearestNeighbor(const KDPoint &srcPoint, 
+                                    KDPoint &nearPoint,
+                                    T &minDistance, 
+                                    KDPlane &minPlane) const = 0;
     };
-
 
     class KDInnerNode : public KDNode
     {
     private:
         unsigned    m_axis;
-        T       m_splitVal;
+        T           m_splitVal;
 
     public:
         KDPlane      m_boundingBox;
@@ -160,52 +162,59 @@ protected:
             return m_boundingBox; 
         }
 
-        virtual void nearestNeighbor(const KDData &srcPoint, KDData &nearPoint,
-                                     T &minDistance, KDPlane &minRegion) 
-                                     const override {
+        virtual void nearestNeighbor(const KDPoint &srcPoint,
+                                    KDPoint &nearPoint,
+                                    T &minDistance,
+                                    KDPlane &minPlane) 
+                                    const override {
 
-            if (intersectPlane(m_left->boundedPlane(), minRegion))
-                m_left->nearestNeighbor(srcPoint, nearPoint, minDistance, minRegion);
+            if (intersectPlane(m_left->boundedPlane(), minPlane))
+                m_left->nearestNeighbor(srcPoint, nearPoint, minDistance, minPlane);
 
-            if (intersectPlane(m_right->boundedPlane(), minRegion))
-                m_right->nearestNeighbor(srcPoint, nearPoint, minDistance, minRegion);
+            if (intersectPlane(m_right->boundedPlane(), minPlane))
+                m_right->nearestNeighbor(srcPoint, nearPoint, minDistance, minPlane);
         }
     };
 
     class KDLeafNode : public KDNode {
 
     private:
-        KDData m_pointCoords;
+        KDPoint m_pointCoords;
 
     public:
-        WKPTR<KDLeafNode> m_Prev, m_Next;
+        WKPTR<KDLeafNode> m_prev, m_next;
 
-        KDLeafNode(const KDData &Point) : m_pointCoords(Point) { }
+        KDLeafNode(const KDPoint &point) : m_pointCoords(point) { }
 
-        KDLeafNode(const KDData &Point, WKPTR<KDLeafNode> Prev, 
+        KDLeafNode(const KDPoint &point, WKPTR<KDLeafNode> Prev, 
                 WKPTR<KDLeafNode> Next) :
-                    m_pointCoords(Point),
-                    m_Prev(Prev),
-                    m_Next(Next) {}
+                    m_pointCoords(point),
+                    m_prev(Prev),
+                    m_next(Next) {}
 
-        const KDData pointCoords() const { return m_pointCoords; }
+        const KDPoint pointCoords() const {
+            return m_pointCoords;
+        }
 
-        virtual bool isInternal() const override  { return false; }
+        virtual bool isInternal() const override  {
+            return false;
+        }
 
         virtual KDPlane boundedPlane() const override  {
             return { m_pointCoords, m_pointCoords };
         }
 
-        virtual void nearestNeighbor(const KDData &srcPoint,
-                                     KDData &nearPoint,
+        virtual void nearestNeighbor(const KDPoint &srcPoint,
+                                     KDPoint &nearPoint,
                                      T &minDistance, 
-                                     KDPlane &minRegion) const override {
-                T currDistance = getDistance(srcPoint, m_pointCoords);
+                                     KDPlane &minPlane) const override {
+            
+            T currDistance = getDistance(srcPoint, m_pointCoords);
 
             if (currDistance < minDistance) {
                 nearPoint   = m_pointCoords;
                 minDistance = currDistance;
-                minRegion   = createPlane(srcPoint, minDistance);
+                minPlane   = createPlane(srcPoint, minDistance);
             }
         }
     };
@@ -213,8 +222,8 @@ protected:
     T getAxisMedian(KDPointIterator iterBegin,
                          KDPointIterator iterEnd,
                          const unsigned num) {
-        // Sorting on the basis of split axis
-        std::sort(iterBegin, iterEnd, [num](const KDData &A, const KDData &B) {
+        
+        std::sort(iterBegin, iterEnd, [num](const KDPoint &A, const KDPoint &B) {
                 return A.first[num] < B.first[num];
         });
 
@@ -225,8 +234,7 @@ protected:
         if (numPoints % 2 == 0)
             median = (median + (*(iterBegin + numPoints / 2 - 1)).first[num]) / 2.0f;
 
-        if (median == (*(iterEnd - 1)).first[num] && median != (*iterBegin).first[num])
-        {
+        if (median == (*(iterEnd - 1)).first[num] && median != (*iterBegin).first[num]) {
             KDPointIterator medianIter = iterBegin + numPoints / 2;
 
             while (median == (*(--medianIter)).first[num]);
@@ -238,30 +246,25 @@ protected:
     }
 
     SHRPTR<KDNode> createKDTree(KDPointIterator iterBegin,
-                                        KDPointIterator iterEnd,
-                                        SHRPTR<KDLeafNode> &lastLeaf,
-                                        unsigned Depth = 0)
-    {
-        // When size of vector is 1, it is the leaf node, else internal nodes
-        if (iterEnd - iterBegin == 1)
-        {
+                                KDPointIterator iterEnd,
+                                SHRPTR<KDLeafNode> &lastLeaf,
+                                unsigned Depth = 0) {
+        
+        if (iterEnd - iterBegin == 1) {
             SHRPTR<KDLeafNode> retNode(new KDLeafNode(*iterBegin));
 
-            if (lastLeaf)
-            {
-                lastLeaf->m_Next = retNode;
-                retNode->m_Prev = lastLeaf;
-            }
-            else
+            if (lastLeaf) {
+                lastLeaf->m_next = retNode;
+                retNode->m_prev = lastLeaf;
+            } else
                 m_firstLeaf = retNode;
 
             lastLeaf = retNode;
 
             return retNode;
         }
-        else if (iterEnd - iterBegin == 2)
-        {
-            KDData point0 = *iterBegin, point1 = *(std::next(iterBegin));
+        else if (iterEnd - iterBegin == 2) {
+            KDPoint point0 = *iterBegin, point1 = *(std::next(iterBegin));
             unsigned splitAxis = diffIndex(point0, point1, Depth % m_dimension);
 
             if (point0.first[splitAxis] > point1.first[splitAxis])
@@ -270,30 +273,27 @@ protected:
             SHRPTR<KDLeafNode> Left(new KDLeafNode(point0)), 
                 Right(new KDLeafNode(point1));
 
-            if (lastLeaf)
-            {
-                lastLeaf->m_Next = Left;
-                Left->m_Prev = lastLeaf;
-            }
-            else
+            if (lastLeaf) {
+                lastLeaf->m_next = Left;
+                Left->m_prev = lastLeaf;
+            } else
                 m_firstLeaf = Left;
 
-            Left->m_Next = Right;
-            Right->m_Prev = Left;
+            Left->m_next = Right;
+            Right->m_prev = Left;
 
             lastLeaf = Right;
 
-            SHRPTR<KDInnerNode> retNode(new KDInnerNode((
-                            point0.first[splitAxis] + point1.first[splitAxis]) / 2.0f, splitAxis,
+            SHRPTR<KDInnerNode> retNode(new KDInnerNode((point0.first[splitAxis] + 
+                            point1.first[splitAxis]) / 2.0f, splitAxis,
                             createPlane(point0, point1), Left, Right));
 
             return retNode;
-        }
-        else {
-            KDPlane   boundedPlane = createPlane(iterBegin, iterEnd);
-            unsigned splitAxis   = diffIndex(boundedPlane, Depth%m_dimension);
-            T    median      = getAxisMedian(iterBegin, iterEnd, splitAxis);
-            size_t   numPoints   = iterEnd - iterBegin;
+        } else {
+            KDPlane     boundedPlane = createPlane(iterBegin, iterEnd);
+            unsigned    splitAxis    = diffIndex(boundedPlane, Depth%m_dimension);
+            T           median       = getAxisMedian(iterBegin, iterEnd, splitAxis);
+            size_t      numPoints    = iterEnd - iterBegin;
 
             KDPointIterator lastMedianLoc = iterBegin + numPoints / 2;
 
@@ -315,12 +315,11 @@ protected:
         }
     }
 
-    KDData semiNearestNeighborPoint(const KDData &srcPoint) const {
+    KDPoint semiNearestNeighborPoint(const KDPoint &srcPoint) const {
         SHRPTR<KDNode> node(m_root);
         SHRPTR<KDInnerNode> iNode;
 
-        while (node->isInternal())
-        {
+        while (node->isInternal()) {
             iNode = std::static_pointer_cast<KDInnerNode>(node);
 
             node = (srcPoint.first[iNode->splitAxis()] <= iNode->splitVal()) ? 
@@ -334,7 +333,6 @@ protected:
 
     SHRPTR<KDNode>          m_root;
     WKPTR<KDLeafNode>       m_firstLeaf;
-    std::ofstream           myfile;
 
 public:
 
@@ -342,7 +340,7 @@ public:
         m_dimension = dim;
     }       
     
-    KDTree(std::vector<KDData> &Points, int dim) {
+    KDTree(std::vector<KDPoint> &Points, int dim) {
         m_dimension = dim;
         insert(Points);
     }
@@ -355,12 +353,11 @@ public:
         m_root.reset();
     }
 
-    KDPlane boundedPlane() const
-    {
+    KDPlane boundedPlane() const {
         if (m_root)
             return m_root->boundedPlane();
         else {
-            KDData P1, P2;
+            KDPoint P1, P2;
 
             for (int i = 0; i < m_dimension; i++){
                 P1.first.push_back(std::numeric_limits<T>::quiet_NaN());
@@ -371,15 +368,14 @@ public:
         }
     }
 
-    void insert(std::vector<KDData> &Points) {
+    void insert(std::vector<KDPoint> &Points) {
         this->clear();
 
         if (Points.size() > 0) {
 
             sort(Points.begin(), Points.end());
             
-            KDPointIterator it = 
-                                unique(Points.begin(), Points.end());
+            KDPointIterator it =  unique(Points.begin(), Points.end());
             
             Points.resize(distance(Points.begin(), it));
             Points.shrink_to_fit();
@@ -390,12 +386,11 @@ public:
         }
     }
 
-    void rebuild(std::vector<KDData> &points) {
+    void rebuild(std::vector<KDPoint> &points) {
         insert(points);
     }
 
-    bool nearestNeighbor(const KDData &srcPoint, KDData &nearPoint) const
-    {
+    bool nearestNeighbor(const KDPoint &srcPoint, KDPoint &nearPoint) const {
         bool retVal = (m_root != nullptr);
 
         if (!m_root) {
@@ -415,42 +410,43 @@ public:
         return retVal;
     }
 
-    void printKDTree(SHRPTR<KDNode> node, unsigned depth = 0)
-    {
+    void printKDTree(SHRPTR<KDNode> node, 
+                    std::ofstream &dumpFile,
+                    unsigned depth = 0) {
         if (node == NULL)
-            myfile << "NULL" << std::endl;
-        else
-        {
-            if (node->isInternal())
-            {
+            dumpFile << "NULL" << std::endl;
+        else {
+            if (node->isInternal()) {
                 SHRPTR<KDInnerNode> iNode = std::static_pointer_cast
                     <KDInnerNode>(node);
 
-                printKDTree(iNode->m_left, depth + 1);
-                printKDTree(iNode->m_right, depth + 1);
+                printKDTree(iNode->m_left, dumpFile, depth + 1);
+                printKDTree(iNode->m_right, dumpFile, depth + 1);
             }
-            else
-            {
+            else {
                 SHRPTR<KDLeafNode> lNode = std::static_pointer_cast
                     <KDLeafNode>(node);
 
-                KDData point = lNode->pointCoords();
+                KDPoint point = lNode->pointCoords();
 
                 std::stringstream ss;
 
                 ss << point.second << " ";
 
                 for (unsigned i = 0; i < m_dimension; i++)
-                    ss << std::setprecision(17) << point.first[i] << " ";
+                    ss << PRINTPRECISE << point.first[i] << " ";
 
-                myfile << ss.str() << std::endl;;
+                dumpFile << ss.str() << std::endl;;
             }
         }
     }
 
     void printKDTree(const std::string& outputFile) {
-        myfile.open (outputFile.c_str(),  std::ofstream::out);
-        printKDTree(m_root, 0);
+        std::ofstream           dumpFile;
+
+        dumpFile.open (outputFile.c_str(),  std::ofstream::out);
+        
+        printKDTree(m_root, dumpFile, 0);
     }
 };
 

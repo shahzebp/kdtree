@@ -6,20 +6,22 @@
 
 #include "kd.h"
 
-std::vector<std::vector<double>> getNextLineAndSplitIntoTokens(std::istream& str)
+#define PRECISION      double   // change this to float or int
+
+std::vector<std::vector<PRECISION>> getNextLineAndSplitIntoTokens(std::istream& str)
 {
-    std::vector<std::vector<double>> data;
+    std::vector<std::vector<PRECISION>> data;
 
     std::string                	line;
     while(std::getline(str,line)) {
 
-        std::vector<double>   		result;
+        std::vector<PRECISION>   		result;
         std::stringstream          lineStream(line);
         std::string                cell;
 
         while(std::getline(lineStream,cell, ',')) {
             std::string::size_type sz; 
-            double mars = std::stod (cell,&sz);
+            PRECISION mars = std::stod (cell,&sz);
 
             result.push_back(mars);
         }
@@ -36,25 +38,31 @@ int main(int argc, char* argv[])
     std::string sampleFile;
     std::cin >> sampleFile;
 
+
+    std::cout << "Enter the name of file to dump the tree" 
+                    << std::endl;
+    std::string dumpFile;
+    std::cin >> dumpFile;
+
 	std::ifstream file(sampleFile);
 
-    std::vector<std::vector<double>> data = 
+    std::vector<std::vector<PRECISION>> data = 
                         getNextLineAndSplitIntoTokens(file);	
     
-    constexpr unsigned int dim = 3;//data.front().size();
+    unsigned int dim = data.front().size();
 
-	KDTree<double> *Tree = new KDTree<double>(3);
+	KDTree<PRECISION> *Tree = new KDTree<PRECISION>(dim);
 
-    std::vector<KDTree<double>::KDData> Points, nearPoints;
+    std::vector<KDTree<PRECISION>::KDPoint> Points, nearPoints;
 
-    std::vector<std::vector<double> >::iterator row;
-    std::vector<double>::iterator col;
+    std::vector<std::vector<PRECISION> >::iterator row;
+    std::vector<PRECISION>::iterator col;
 
     unsigned index = 0;
 
     for (row = data.begin(); row != data.end(); row++) {
 		
-        KDTree<double>::KDData Point;
+        KDTree<PRECISION>::KDPoint Point;
 		int i = 0;
 		for (col = row->begin(); col != row->end(); col++) {
 		  
@@ -69,10 +77,6 @@ int main(int argc, char* argv[])
 	
     Tree->insert(Points);
 
-    std::cout << "Enter the name of file to dump the tree" 
-                    << std::endl;
-    std::string dumpFile;
-    std::cin >> dumpFile;
 
     Tree->printKDTree(dumpFile);
    
