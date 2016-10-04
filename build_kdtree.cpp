@@ -38,7 +38,6 @@ int main(int argc, char* argv[])
     std::string sampleFile;
     std::cin >> sampleFile;
 
-
     std::cout << "Enter the name of file to dump the tree" 
                     << std::endl;
     std::string dumpFile;
@@ -76,7 +75,6 @@ int main(int argc, char* argv[])
 	}
 	
     Tree->insert(Points);
-
 
     Tree->printKDTree(dumpFile);
    

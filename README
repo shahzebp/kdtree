@@ -1,0 +1,23 @@
+KDTree in C++11
+
+1. 	To build, run the make command in the directory of kdtree. This will build
+	two applications build_kdtree, query_kdtree
+
+2. 	Run as ./build_kdree. It will ask for a file name that contains sample data.
+	Enter the name and press enter. Then it will ask the name of file to dump
+	the tree. Enter the name and press enter.
+
+3. Run as ./query_kdtree. It will ask the name of file to read the tree from. Enter the
+	the name of file which you created using build_tree binary.
+	Then it will ask you the file that contains query points. Enter the name of the file
+	Then it will ask the name of file that to enter the answers to each query entry.
+	The nearest point index for each query and the Euclidean distance between them would
+	be present in this answer file.
+
+Note: 	sample data files and query point files are comma separated.
+		Code builds with C++11 flag on g++ compiler.
+
+		Use make clean to delete the binary files.
+
+		To change the precision from double to float, change the value of
+		#define PRECISION in the cpp files respectively.
